@@ -6,8 +6,11 @@ import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
+const require = createRequire(import.meta.url)
+const minimumDshNodeVersion = [22, 15, 0]
 const home = os.homedir()
 const configDir = path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'dsh-web')
 const credentialFile = path.join(configDir, 'credentials.json')
@@ -19,6 +22,49 @@ const upstreamPort = port(process.env.DSH_WEB_UPSTREAM_PORT, 3081, 'DSH_WEB_UPST
 const bindHost = process.env.DSH_WEB_HOST || lanAddress()
 const publicAuthority = `${bindHost}:${publicPort}`
 const upstreamAuthority = `127.0.0.1:${upstreamPort}`
+
+function versionAtLeast(version, minimum) {
+  const values = version.split('.').map(value => Number(value) || 0)
+  for (let index = 0; index < minimum.length; index++) {
+    if (values[index] > minimum[index]) return true
+    if (values[index] < minimum[index]) return false
+  }
+  return true
+}
+
+function dshRuntimeCheck() {
+  const missing = []
+  try {
+    if (typeof require('node:zlib').createZstdDecompress !== 'function') missing.push('node:zlib.createZstdDecompress')
+  } catch { missing.push('node:zlib.createZstdDecompress') }
+  try {
+    if (typeof require('node:module').stripTypeScriptTypes !== 'function') missing.push('node:module.stripTypeScriptTypes')
+  } catch { missing.push('node:module.stripTypeScriptTypes') }
+  return { version: process.versions.node, compatible: versionAtLeast(process.versions.node, minimumDshNodeVersion) && missing.length === 0, missing }
+}
+
+function requireDshRuntime() {
+  const result = dshRuntimeCheck()
+  if (result.compatible) return true
+  const required = minimumDshNodeVersion.join('.')
+  console.error(`[dsh-web] Node.js v${result.version} is incompatible with the installed DSH runtime.`)
+  console.error(`[dsh-web] Required: Node.js >= ${required} (Node 24 LTS recommended).`)
+  if (result.missing.length) console.error(`[dsh-web] Missing: ${result.missing.join(', ')}.`)
+  console.error('[dsh-web] 请升级 Node.js 后重新运行 dsh-web install。')
+  process.exitCode = 78
+  return false
+}
+
+function doctor() {
+  const result = dshRuntimeCheck()
+  console.log(`Node.js: v${result.version}`)
+  console.log(`DSH runtime requirement: >= ${minimumDshNodeVersion.join('.')} (Node 24 LTS recommended)`)
+  if (result.compatible) console.log('DSH runtime check: OK')
+  else {
+    console.error(`DSH runtime check: FAILED${result.missing.length ? ` (${result.missing.join(', ')})` : ''}`)
+    process.exitCode = 78
+  }
+}
 
 function executableOnPath(name) {
   for (const directory of (process.env.PATH || '').split(path.delimiter)) {
@@ -281,7 +327,7 @@ function serviceText() {
   const executableDir = path.dirname(process.execPath)
   const binDir = path.dirname(scriptPath)
   const servicePath = [...new Set([executableDir, binDir, path.dirname(dshBin), '/usr/local/sbin', '/usr/local/bin', '/usr/sbin', '/usr/bin', '/sbin', '/bin'])].join(path.delimiter)
-  return `[Unit]\nDescription=Authenticated DSH Web LAN endpoint\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=simple\nWorkingDirectory=${home}\nEnvironment=PATH=${servicePath}\nEnvironment=DSH_BIN=${dshBin}\nExecStart=${process.execPath} ${scriptPath} start\nRestart=on-failure\nRestartSec=3\nKillMode=control-group\n\n[Install]\nWantedBy=default.target\n`
+  return `[Unit]\nDescription=Authenticated DSH Web LAN endpoint\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=simple\nWorkingDirectory=${home}\nEnvironment=PATH=${servicePath}\nEnvironment=DSH_BIN=${dshBin}\nExecStart=${process.execPath} ${scriptPath} start\nRestart=on-failure\nRestartPreventExitStatus=78\nRestartSec=3\nKillMode=control-group\n\n[Install]\nWantedBy=default.target\n`
 }
 
 function systemctl(args) { return spawnSync('systemctl', ['--user', ...args], { stdio: 'inherit' }).status === 0 }
@@ -302,16 +348,18 @@ function status() {
   probe.once('error', () => { console.error('dsh-web is not listening'); process.exitCode = 1 })
 }
 
-function usage() { console.log('Usage: dsh-web [install|start|status|reset-password]\n\nEnvironment: DSH_WEB_HOST, DSH_WEB_PORT, DSH_WEB_UPSTREAM_PORT, DSH_WEB_USERNAME, DSH_WEB_PASSWORD, DSH_BIN') }
+function usage() { console.log('Usage: dsh-web [install|start|status|reset-password|doctor]\n\nEnvironment: DSH_WEB_HOST, DSH_WEB_PORT, DSH_WEB_UPSTREAM_PORT, DSH_WEB_USERNAME, DSH_WEB_PASSWORD, DSH_BIN') }
 
 const command = process.argv[2] || 'start'
 if (['-h', '--help', 'help'].includes(command)) usage()
-else if (command === 'install') install()
-else if (command === 'start') start()
-else if (command === 'status') status()
+else if (command === 'install') { if (requireDshRuntime()) install() }
+else if (command === 'start') { if (requireDshRuntime()) start() }
+else if (command === 'status') { if (requireDshRuntime()) status() }
+else if (command === 'doctor') doctor()
 else if (command === 'reset-password') {
   setCredentials(true)
-  if (systemctl(['is-active', '--quiet', 'dsh-web.service'])) {
+  if (!requireDshRuntime()) console.error('Credentials were updated, but the service was not restarted.')
+  else if (systemctl(['is-active', '--quiet', 'dsh-web.service'])) {
     if (!systemctl(['restart', 'dsh-web.service'])) process.exitCode = 1
     else console.log('Credentials updated and dsh-web.service restarted.')
   } else console.log('Credentials updated.')

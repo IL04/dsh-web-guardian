@@ -6,6 +6,17 @@
 gateway. It keeps the DSH process alive as a user-level systemd service, so
 the Web UI continues running after the SSH terminal is closed.
 
+## Prerequisite
+
+DSH requires **Node.js 22.15.0 or later** because it relies on the Zstandard
+and TypeScript runtime APIs introduced in that release. Node 24 LTS is
+recommended. `dsh-web install` and `dsh-web start` check this before making
+any service changes; an incompatible runtime is rejected with upgrade guidance.
+
+```bash
+dsh-web doctor
+```
+
 ## Features
 
 - One-time installation creates, enables, and starts `dsh-web.service`.
@@ -55,6 +66,7 @@ Open the URL printed by the command from another machine on the same LAN.
 dsh-web install                 # create and start the user service
 dsh-web status                  # show service / listener status
 dsh-web reset-password          # generate a new password
+dsh-web doctor                  # check the required Node.js runtime
 dsh-web start                   # run in the foreground
 systemctl --user restart dsh-web
 ```

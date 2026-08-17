@@ -6,6 +6,16 @@
 的常驻 Web 守护服务。安装完成后，它会以用户级 systemd 服务持续运行 DSH
 前端：即使关闭 SSH 终端，Web UI 也不会退出。
 
+## 前置要求
+
+DSH 依赖 Node.js 22.15.0 引入的 Zstandard 与 TypeScript 运行时 API，因此要求
+**Node.js 22.15.0 或更高版本**，推荐使用 Node 24 LTS。`dsh-web install` 与
+`dsh-web start` 会在修改服务前预检运行时；若不符合要求会拒绝启动并提示升级。
+
+```bash
+dsh-web doctor
+```
+
 ## 主要特性
 
 - 一次安装即可创建、启用并启动 `dsh-web.service`。
@@ -50,6 +60,7 @@ dsh-web reset-password
 dsh-web install                 # 创建并启动用户级服务
 dsh-web status                  # 查看服务与监听状态
 dsh-web reset-password          # 生成新密码
+dsh-web doctor                  # 检查所需的 Node.js 运行时
 dsh-web start                   # 在前台运行
 systemctl --user restart dsh-web
 ```

@@ -1,6 +1,6 @@
 {
   "name": "dsh-web-guardian",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Persistent, authenticated LAN UI for DeepSeek Harness Web",
   "type": "module",
   "bin": {
@@ -12,7 +12,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=22.15.0"
   },
   "scripts": {
     "check": "node --check bin/dsh-web.mjs",
