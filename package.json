@@ -1,0 +1,28 @@
+{
+  "name": "dsh-web-guardian",
+  "version": "0.1.0",
+  "description": "Persistent, authenticated LAN UI for DeepSeek Harness Web",
+  "type": "module",
+  "bin": {
+    "dsh-web": "./bin/dsh-web.mjs"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "check": "node --check bin/dsh-web.mjs",
+    "pack:check": "npm pack --dry-run"
+  },
+  "keywords": [
+    "deepseek",
+    "dsh",
+    "web-ui",
+    "systemd"
+  ],
+  "license": "MIT"
+}
