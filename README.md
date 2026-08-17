@@ -44,6 +44,8 @@ DSH_WEB_USERNAME=lyy DSH_WEB_PASSWORD='change-me-now' dsh-web install
 dsh-web reset-password
 ```
 
+若服务正在运行，此命令会自动重启服务，使新密码立即生效。
+
 从同一局域网的另一台设备打开命令输出的 URL（通常为
 `http://<服务器局域网-IP>:3080`），即可使用网页登录。常用命令：
 
@@ -97,6 +99,9 @@ only as a hash. Generate a new random password with:
 ```bash
 dsh-web reset-password
 ```
+
+When the service is running, this command automatically restarts it so the
+new password takes effect immediately.
 
 Open the URL printed by the command from another machine on the same LAN.
 

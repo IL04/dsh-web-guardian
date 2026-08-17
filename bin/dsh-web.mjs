@@ -251,7 +251,7 @@ function install() {
   if (existing && !process.env.DSH_WEB_PASSWORD) console.log(`Using existing credentials for ${credentials.username}. Run \`dsh-web reset-password\` to generate a new password.`)
   fs.mkdirSync(unitDir, { recursive: true, mode: 0o700 })
   fs.writeFileSync(unitFile, serviceText(), { mode: 0o644 })
-  if (!systemctl(['daemon-reload']) || !systemctl(['enable', '--now', 'dsh-web.service'])) process.exitCode = 1
+  if (!systemctl(['daemon-reload']) || !systemctl(['enable', 'dsh-web.service']) || !systemctl(['restart', 'dsh-web.service'])) process.exitCode = 1
   else console.log(`Installed and started dsh-web.service. Open http://${bindHost}:${publicPort}`)
 }
 
@@ -268,5 +268,11 @@ if (['-h', '--help', 'help'].includes(command)) usage()
 else if (command === 'install') install()
 else if (command === 'start') start()
 else if (command === 'status') status()
-else if (command === 'reset-password') { setCredentials(true); console.log('Credentials updated.') }
+else if (command === 'reset-password') {
+  setCredentials(true)
+  if (systemctl(['is-active', '--quiet', 'dsh-web.service'])) {
+    if (!systemctl(['restart', 'dsh-web.service'])) process.exitCode = 1
+    else console.log('Credentials updated and dsh-web.service restarted.')
+  } else console.log('Credentials updated.')
+}
 else { console.error(`Unknown command: ${command}`); usage(); process.exitCode = 2 }
