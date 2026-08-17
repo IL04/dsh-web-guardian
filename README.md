@@ -33,6 +33,8 @@ dsh-web install
 
 首次安装会生成并显示随机密码。若要自行指定账户和密码：
 
+默认账户名为 `admin`。
+
 ```bash
 DSH_WEB_USERNAME=lyy DSH_WEB_PASSWORD='change-me-now' dsh-web install
 ```
@@ -86,7 +88,8 @@ npm install -g github:IL04/dsh-web-guardian
 dsh-web install
 ```
 
-The first install prints a generated password. To choose credentials instead:
+The first install prints a generated password. The default username is `admin`.
+To choose credentials instead:
 
 ```bash
 DSH_WEB_USERNAME=lyy DSH_WEB_PASSWORD='change-me-now' dsh-web install

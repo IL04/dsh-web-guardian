@@ -85,7 +85,7 @@ function setCredentials(reset) {
   const existing = loadCredentials()
   const supplied = process.env.DSH_WEB_PASSWORD
   if (!reset && existing && !supplied) return existing
-  const username = process.env.DSH_WEB_USERNAME || existing?.username || 'dsh'
+  const username = process.env.DSH_WEB_USERNAME || existing?.username || 'admin'
   const password = supplied || crypto.randomBytes(24).toString('base64url')
   writeCredentials(username, password)
   if (supplied) console.error('[dsh-web] Credentials updated from environment variables.')
