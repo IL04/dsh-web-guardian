@@ -20,6 +20,21 @@ const bindHost = process.env.DSH_WEB_HOST || lanAddress()
 const publicAuthority = `${bindHost}:${publicPort}`
 const upstreamAuthority = `127.0.0.1:${upstreamPort}`
 
+function executableOnPath(name) {
+  for (const directory of (process.env.PATH || '').split(path.delimiter)) {
+    const candidate = path.join(directory || '.', name)
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK)
+      return candidate
+    } catch {}
+  }
+}
+
+// Resolve this during installation, while the interactive shell still has the
+// global DSH bin directory on PATH. The generated systemd unit then continues
+// to work even when it has a minimal service PATH.
+const dshBin = process.env.DSH_BIN || executableOnPath('dsh') || 'dsh'
+
 function port(value, fallback, name) {
   if (!value) return fallback
   const result = Number(value)
@@ -74,7 +89,7 @@ function setCredentials(reset) {
   const password = supplied || crypto.randomBytes(24).toString('base64url')
   writeCredentials(username, password)
   if (supplied) console.error('[dsh-web] Credentials updated from environment variables.')
-  else console.error(`[dsh-web] Initial password for ${username}: ${password}`)
+  else console.error(`[dsh-web] ${reset ? 'New' : 'Initial'} password for ${username}: ${password}`)
   return loadCredentials()
 }
 
@@ -211,7 +226,7 @@ function start() {
   server.on('error', error => { console.error(`[dsh-web] Cannot listen on ${bindHost}:${publicPort}: ${error.message}`); process.exit(1) })
   server.listen(publicPort, bindHost, () => {
     console.error(`[dsh-web] LAN URL: http://${bindHost}:${publicPort} (user: ${credentials.username})`)
-    const child = spawn(process.env.DSH_BIN || 'dsh', ['web', '--port', String(upstreamPort)], { stdio: 'inherit', env: process.env })
+    const child = spawn(dshBin, ['web', '--port', String(upstreamPort)], { stdio: 'inherit', env: process.env })
     let closing = false
     const close = code => server.listening ? server.close(() => process.exit(code)) : process.exit(code)
     const stop = signal => { if (closing) return; closing = true; child.kill(signal); close(0) }
@@ -224,13 +239,16 @@ function start() {
 function serviceText() {
   const executableDir = path.dirname(process.execPath)
   const binDir = path.dirname(scriptPath)
-  return `[Unit]\nDescription=Authenticated DSH Web LAN endpoint\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=simple\nWorkingDirectory=${home}\nEnvironment=PATH=${executableDir}:${binDir}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nExecStart=${process.execPath} ${scriptPath} start\nRestart=on-failure\nRestartSec=3\nKillMode=control-group\n\n[Install]\nWantedBy=default.target\n`
+  const servicePath = [...new Set([executableDir, binDir, path.dirname(dshBin), '/usr/local/sbin', '/usr/local/bin', '/usr/sbin', '/usr/bin', '/sbin', '/bin'])].join(path.delimiter)
+  return `[Unit]\nDescription=Authenticated DSH Web LAN endpoint\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=simple\nWorkingDirectory=${home}\nEnvironment=PATH=${servicePath}\nEnvironment=DSH_BIN=${dshBin}\nExecStart=${process.execPath} ${scriptPath} start\nRestart=on-failure\nRestartSec=3\nKillMode=control-group\n\n[Install]\nWantedBy=default.target\n`
 }
 
 function systemctl(args) { return spawnSync('systemctl', ['--user', ...args], { stdio: 'inherit' }).status === 0 }
 
 function install() {
-  setCredentials(false)
+  const existing = loadCredentials()
+  const credentials = setCredentials(false)
+  if (existing && !process.env.DSH_WEB_PASSWORD) console.log(`Using existing credentials for ${credentials.username}. Run \`dsh-web reset-password\` to generate a new password.`)
   fs.mkdirSync(unitDir, { recursive: true, mode: 0o700 })
   fs.writeFileSync(unitFile, serviceText(), { mode: 0o644 })
   if (!systemctl(['daemon-reload']) || !systemctl(['enable', '--now', 'dsh-web.service'])) process.exitCode = 1

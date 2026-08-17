@@ -37,6 +37,13 @@ dsh-web install
 DSH_WEB_USERNAME=lyy DSH_WEB_PASSWORD='change-me-now' dsh-web install
 ```
 
+如果此前已存在 `~/.config/dsh-web/credentials.json`，安装会复用已有账户，
+且无法显示原密码（密码仅以哈希形式保存）。需要新随机密码时运行：
+
+```bash
+dsh-web reset-password
+```
+
 从同一局域网的另一台设备打开命令输出的 URL（通常为
 `http://<服务器局域网-IP>:3080`），即可使用网页登录。常用命令：
 
@@ -81,6 +88,14 @@ The first install prints a generated password. To choose credentials instead:
 
 ```bash
 DSH_WEB_USERNAME=lyy DSH_WEB_PASSWORD='change-me-now' dsh-web install
+```
+
+If `~/.config/dsh-web/credentials.json` already exists, installation reuses
+those credentials and cannot display the previous password, which is stored
+only as a hash. Generate a new random password with:
+
+```bash
+dsh-web reset-password
 ```
 
 Open the URL printed by the command from another machine on the same LAN.
