@@ -19,7 +19,7 @@ DSH 本体只监听本机回环地址 `127.0.0.1:3081`；守护服务在局域�
 - 自定义中文密码登录页，使用 `HttpOnly`、`SameSite` 会话 Cookie。
 - 兼容脚本和健康检查的 HTTP Basic Auth。
 - DSH 的设置和凭据 API 也由已认证网关保护。
-- 为 HTTP 环境缺少 `crypto.randomUUID()` 的浏览器自动注入兼容实现。
+- 为 HTTP 环境或精简浏览器缺少 `crypto.randomUUID()` 的情况自动注入兼容实现。
 
 ### 安装与使用
 
@@ -76,7 +76,7 @@ the Web UI continues running after the SSH terminal is closed.
 - Password form login with an HttpOnly, SameSite session cookie.
 - Basic Auth remains available to scripts and health checks.
 - The DSH settings/credentials API remains behind the authenticated gateway.
-- Includes a compatibility shim for browsers where HTTP pages lack
+- Includes a compatibility shim when HTTP pages or restricted browsers lack
   `crypto.randomUUID()`.
 
 ### Install

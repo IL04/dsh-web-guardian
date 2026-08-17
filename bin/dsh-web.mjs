@@ -170,7 +170,11 @@ function unauthorized(target, upgrade = false) {
   target.writeHead(401, { 'Cache-Control': 'no-store' }); target.end('Authentication required.\n')
 }
 
-const uuidShim = `<script data-dsh-web-uuid-shim>(function(){const c=globalThis.crypto;if(!c||typeof c.randomUUID==='function'||typeof c.getRandomValues!=='function')return;c.randomUUID=()=>{const b=c.getRandomValues(new Uint8Array(16));b[6]=b[6]&15|64;b[8]=b[8]&63|128;const h=Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');return[h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join('-')}}</script>`
+// DSH uses UUIDs as client-side request identifiers. On HTTP origins some
+// browsers omit crypto.randomUUID(), and a few embedded browsers omit Web
+// Crypto entirely. Provide a standards-shaped UUID v4 fallback before any
+// DSH client module is evaluated.
+const uuidShim = `<script data-dsh-web-uuid-shim>(function(){const c=globalThis.crypto||(globalThis.crypto={});if(typeof c.randomUUID==='function')return;c.randomUUID=()=>{const b=new Uint8Array(16);if(typeof c.getRandomValues==='function')c.getRandomValues(b);else for(let i=0;i<b.length;i++)b[i]=Math.floor(Math.random()*256);b[6]=b[6]&15|64;b[8]=b[8]&63|128;const h=Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');return[h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join('-')}}</script>`
 
 function headers(request) {
   const api = request.url === '/api' || request.url?.startsWith('/api/')
