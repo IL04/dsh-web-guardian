@@ -217,7 +217,32 @@ function proxyUpgrade(request, socket, head) {
   upstream.end()
 }
 
-function start() {
+function waitForUpstream(timeoutMs = 30000) {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs
+    let settled = false
+    const retry = () => {
+      if (settled) return
+      if (Date.now() >= deadline) {
+        settled = true
+        reject(new Error(`DSH Web did not become ready on ${upstreamAuthority} within ${timeoutMs / 1000} seconds`))
+      } else setTimeout(probe, 200)
+    }
+    const probe = () => {
+      const request = http.get({ host: '127.0.0.1', port: upstreamPort, path: '/', timeout: 1500 }, response => {
+        response.resume()
+        if (settled) return
+        if ((response.statusCode || 500) < 500) { settled = true; resolve() }
+        else retry()
+      })
+      request.on('error', retry)
+      request.on('timeout', () => request.destroy())
+    }
+    probe()
+  })
+}
+
+async function start() {
   const credentials = setCredentials(false)
   const server = http.createServer((request, response) => {
     const pathname = new URL(request.url || '/', `http://${publicAuthority}`).pathname
@@ -227,17 +252,29 @@ function start() {
     proxy(request, response)
   })
   server.on('upgrade', (request, socket, head) => authenticated(request, credentials) ? proxyUpgrade(request, socket, head) : unauthorized(socket, true))
-  server.on('error', error => { console.error(`[dsh-web] Cannot listen on ${bindHost}:${publicPort}: ${error.message}`); process.exit(1) })
-  server.listen(publicPort, bindHost, () => {
-    console.error(`[dsh-web] LAN URL: http://${bindHost}:${publicPort} (user: ${credentials.username})`)
-    const child = spawn(dshBin, ['web', '--port', String(upstreamPort)], { stdio: 'inherit', env: process.env })
-    let closing = false
-    const close = code => server.listening ? server.close(() => process.exit(code)) : process.exit(code)
-    const stop = signal => { if (closing) return; closing = true; child.kill(signal); close(0) }
-    process.once('SIGINT', () => stop('SIGINT')); process.once('SIGTERM', () => stop('SIGTERM'))
-    child.once('error', error => { console.error(`[dsh-web] Failed to start dsh: ${error.message}`); close(1) })
-    child.once('exit', code => close(code ?? 1))
-  })
+  const child = spawn(dshBin, ['web', '--port', String(upstreamPort)], { stdio: 'inherit', env: process.env })
+  let closing = false
+  let closed = false
+  const close = code => {
+    if (closed) return
+    closed = true
+    if (server.listening) server.close(() => process.exit(code))
+    else process.exit(code)
+  }
+  const stop = signal => { if (closing) return; closing = true; child.kill(signal); close(0) }
+  process.once('SIGINT', () => stop('SIGINT')); process.once('SIGTERM', () => stop('SIGTERM'))
+  child.once('error', error => { console.error(`[dsh-web] Failed to start dsh: ${error.message}`); close(1) })
+  child.once('exit', code => close(code ?? 1))
+  server.on('error', error => { console.error(`[dsh-web] Cannot listen on ${bindHost}:${publicPort}: ${error.message}`); child.kill('SIGTERM'); close(1) })
+  try {
+    await waitForUpstream()
+    if (closed) return
+    server.listen(publicPort, bindHost, () => console.error(`[dsh-web] LAN URL: http://${bindHost}:${publicPort} (user: ${credentials.username})`))
+  } catch (error) {
+    console.error(`[dsh-web] ${error.message}`)
+    child.kill('SIGTERM')
+    close(1)
+  }
 }
 
 function serviceText() {

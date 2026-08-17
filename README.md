@@ -11,6 +11,8 @@ the Web UI continues running after the SSH terminal is closed.
 - One-time installation creates, enables, and starts `dsh-web.service`.
 - DSH stays on `127.0.0.1:3081`; the gateway listens on a selected LAN IPv4
   address at port `3080`.
+- The public listener opens only after DSH is ready, preventing an initial
+  page load from receiving incomplete plugin assets.
 - Password form login with an HttpOnly, SameSite session cookie.
 - Basic Auth remains available to scripts and health checks.
 - The DSH settings and credentials API remains behind the authenticated gateway.
